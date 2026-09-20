@@ -1,0 +1,90 @@
+name: API Tests
+
+# The suite runs against the live GitLab API, so it is exercised on every change, on a nightly
+# schedule (to catch changes on GitLab's side rather than ours), and on demand.
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+# A push that supersedes an in-flight run cancels it: no point spending API quota on stale code.
+concurrency:
+  group: api-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+# The job only reads the repository; nothing here needs write access to it.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: GitLab Issues API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # Secrets are not exposed to pull requests from forks, and the repository secret may simply
+      # not be set yet. Say so in one line rather than through a wall of 401s further down.
+      - name: Check the token is available
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+        run: |
+          if [ -z "$GITLAB_TOKEN" ]; then
+            echo "::error::GITLAB_TOKEN is not available. Set it under Settings > Secrets and variables > Actions. Pull requests from forks cannot read it by design."
+            exit 1
+          fi
+
+      - name: Run the test suite
+        env:
+          # Repository secret: an OAuth2 or personal access token with the `api` scope.
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          # Optional repository variable; falls back to gitlab.com when unset.
+          GITLAB_BASE_URL: ${{ vars.GITLAB_BASE_URL }}
+        run: mvn -B --no-transfer-progress test
+
+      - name: Summarise the results
+        if: always()
+        run: |
+          echo "### Test results" >> "$GITHUB_STEP_SUMMARY"
+          python3 .github/scripts/summarise_results.py >> "$GITHUB_STEP_SUMMARY"
+
+      # The raw results are only readable through the Allure tooling, so render the HTML report
+      # here — a reviewer downloads one artifact and opens index.html.
+      - name: Render the Allure report
+        if: always()
+        continue-on-error: true
+        run: mvn -B --no-transfer-progress allure:report
+
+      - name: Upload the reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/allure-results/
+            target/site/allure-maven-plugin/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload the Cucumber features as living documentation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feature-files
+          path: src/test/resources/features/
+          retention-days: 14
+          if-no-files-found: warn

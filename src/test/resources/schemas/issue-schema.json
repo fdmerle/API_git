@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GitLab issue",
+  "description": "Contract the Issues API is expected to honour for a single issue representation.",
+  "type": "object",
+  "required": ["id", "iid", "project_id", "title", "state", "labels", "web_url", "author", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "iid": { "type": "integer", "minimum": 1 },
+    "project_id": { "type": "integer", "minimum": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": ["string", "null"] },
+    "state": { "type": "string", "enum": ["opened", "closed"] },
+    "labels": { "type": "array", "items": { "type": "string" } },
+    "confidential": { "type": "boolean" },
+    "due_date": { "type": ["string", "null"], "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "web_url": { "type": "string", "format": "uri" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "closed_at": { "type": ["string", "null"] },
+    "author": {
+      "type": "object",
+      "required": ["id", "username"],
+      "properties": {
+        "id": { "type": "integer" },
+        "username": { "type": "string" }
+      }
+    }
+  }
+}

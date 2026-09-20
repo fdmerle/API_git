@@ -27,3 +27,16 @@ hs_err_pid*
 .idea
 target
 *.iml
+# Test reports
+allure-results
+.allure
+
+# Local credentials - never commit a token
+.env
+
+# Local agent/editor configuration - not part of the deliverable
+.claude
+
+# Python bytecode
+__pycache__/
+*.pyc
