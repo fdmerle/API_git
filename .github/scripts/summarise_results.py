@@ -20,13 +20,16 @@ def simple_name(qualified_name: str) -> str:
 
 
 def failures_in(suite: ET.Element) -> list[tuple[str, str]]:
-    """(test name, first line of the failure message) for every failed or errored test case."""
+    """(test name, one-line failure message) for every failed or errored test case."""
     failed = []
     for case in suite.iter("testcase"):
         for outcome in list(case.findall("failure")) + list(case.findall("error")):
             name = f"{simple_name(case.get('classname', ''))}.{case.get('name', '?')}"
-            message = (outcome.get("message") or outcome.get("type") or "").strip().splitlines()
-            summary = message[0] if message else "no message"
+            # AssertJ puts the as(...) description on the first line and the expected-versus-actual
+            # on the ones after it, so the whole message is collapsed onto a single line rather than
+            # truncated to its first - keeping the half that says what actually went wrong.
+            message = " ".join((outcome.get("message") or outcome.get("type") or "").split())
+            summary = message or "no message"
             if len(summary) > MAX_MESSAGE_CHARS:
                 summary = summary[:MAX_MESSAGE_CHARS] + "..."
             failed.append((name, summary))
